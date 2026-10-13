@@ -61,7 +61,47 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
+        checkLicense()
         setupTabs()
+    }
+
+    /**
+     * 启动时联网检查作者维护状态。
+     * 读取 https://www.cnblogs.com/cortana1/p/19510092 正文中的 STOP 标记：
+     *   STOP:0 → 作者已停止维护，弹出"软件不可用"并退出；
+     *   STOP:1 → 正常运行；
+     *   网络失败 / 解析不到 → 弹出"网络异常，请联网使用"并退出。
+     */
+    private fun checkLicense() {
+        Thread {
+            val stop = try {
+                val url = java.net.URL("https://www.cnblogs.com/cortana1/p/19510092")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.connectTimeout = 5000
+                conn.readTimeout = 8000
+                conn.requestMethod = "GET"
+                conn.instanceFollowRedirects = true
+                val body = conn.inputStream.bufferedReader().readText()
+                conn.disconnect()
+                Regex("STOP\\s*[:：]?\\s*(\\d+)").find(body)?.groupValues?.get(1)?.toIntOrNull()
+            } catch (e: Exception) {
+                null
+            }
+            handler.post {
+                if (stop != null && stop == 1) {
+                    // 作者维护中，正常运行
+                    return@post
+                }
+                val title = if (stop == 0) "软件不可用" else "网络异常"
+                val msg = if (stop == 0) "作者已停止维护，本软件不可用。" else "请联网使用本软件。"
+                androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setTitle(title)
+                    .setMessage(msg)
+                    .setCancelable(false)
+                    .setPositiveButton("确定") { _, _ -> finish() }
+                    .show()
+            }
+        }.start()
     }
 
     private fun setupTabs() {

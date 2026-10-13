@@ -7,10 +7,13 @@
     <!-- 自定义USB设备授权广播权限，配合 PendingIntent 使用 -->
     <uses-permission android:name="android.permission.USB_PERMISSION"/>
 
+    <!-- 启动时联网检查作者维护状态 -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
         android:allowBackup="true"
-        android:icon="@drawable/ic_launcher"
-        android:label="OTG串口助手"
+        android:icon="@mipmap/ic_launcher"
+        android:label="唯卓仕镜头电机控制上位机"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
         <activity
