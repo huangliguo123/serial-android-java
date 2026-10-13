@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="8dp"
+        android:background="#EEF2F7">
+
+        <!-- ================= 电机配置 ================= -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="12dp"
+            android:layout_marginBottom="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="电机配置"
+                android:textStyle="bold"
+                android:textSize="15sp"
+                android:textColor="#1C2530"/>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp">
+                <TextView style="@style/FieldLabel" android:text="型号：" />
+                <Spinner
+                    android:id="@+id/spModel"
+                    android:layout_width="120dp"
+                    android:layout_height="wrap_content"/>
+                <TextView style="@style/FieldLabel" android:text="配置轴:" android:layout_marginStart="8dp"/>
+                <Spinner
+                    android:id="@+id/spConfigAxis"
+                    android:layout_width="90dp"
+                    android:layout_height="wrap_content"/>
+                <TextView style="@style/FieldLabel" android:text="往复延时(ms):" android:layout_marginStart="8dp"/>
+                <EditText
+                    android:id="@+id/edtRecurDelay"
+                    android:layout_width="60dp"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:text="500"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <TextView style="@style/FieldLabel" android:text="加速度:" />
+                <EditText android:id="@+id/edtAccCur" style="@style/FieldValue" android:enabled="false"/>
+                <TextView style="@style/FieldLabel" android:text="减速度:" android:layout_marginStart="10dp"/>
+                <EditText android:id="@+id/edtDecCur" style="@style/FieldValue" android:enabled="false"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <TextView style="@style/FieldLabel" android:text="启动速度:" />
+                <EditText android:id="@+id/edtStartCur" style="@style/FieldValue" android:enabled="false"/>
+                <TextView style="@style/FieldLabel" android:text="停止速度:" android:layout_marginStart="10dp"/>
+                <EditText android:id="@+id/edtStopCur" style="@style/FieldValue" android:enabled="false"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <TextView style="@style/FieldLabel" android:text="设加速度:" />
+                <EditText android:id="@+id/edtSetAcc" style="@style/FieldValue" android:hint="400"/>
+                <TextView style="@style/FieldLabel" android:text="设减速度:" android:layout_marginStart="10dp"/>
+                <EditText android:id="@+id/edtSetDec" style="@style/FieldValue" android:hint="400"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <TextView style="@style/FieldLabel" android:text="设启速:" />
+                <EditText android:id="@+id/edtSetStart" style="@style/FieldValue" android:hint="400"/>
+                <TextView style="@style/FieldLabel" android:text="设停速:" android:layout_marginStart="10dp"/>
+                <EditText android:id="@+id/edtSetStop" style="@style/FieldValue" android:hint="400"/>
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="10dp">
+                <Button style="@style/SmallBtn" android:id="@+id/btnSpeedCurve" android:text="速度曲线"/>
+                <Button style="@style/SmallBtn" android:id="@+id/btnSensorCurve" android:text="传感器曲线" android:layout_marginStart="4dp"/>
+            </LinearLayout>
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="6dp">
+                <Button style="@style/SmallBtn" android:id="@+id/btnGetConfig" android:text="获取配置"/>
+                <Button style="@style/SmallBtn" android:id="@+id/btnSetConfig" android:text="下发配置" android:layout_marginStart="4dp"/>
+                <Button style="@style/SmallBtn" android:id="@+id/btnImportJson" android:text="导入JSON" android:layout_marginStart="4dp"/>
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ================= AP ================= -->
+        <include android:id="@+id/ap_card"
+            layout="@layout/axis_control"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- ================= AF1 ================= -->
+        <include android:id="@+id/af1_card"
+            layout="@layout/axis_control"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- ================= AF2 ================= -->
+        <include android:id="@+id/af2_card"
+            layout="@layout/axis_control"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"/>
+
+        <!-- ================= 日志 ================= -->
+        <EditText
+            android:id="@+id/edtLog"
+            android:layout_width="match_parent"
+            android:layout_height="140dp"
+            android:editable="false"
+            android:inputType="textMultiLine"
+            android:scrollbars="vertical"
+            android:textSize="12sp"
+            android:background="@drawable/card_bg"
+            android:padding="8dp"/>
+
+    </LinearLayout>
+</ScrollView>

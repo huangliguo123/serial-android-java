@@ -2,89 +2,40 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="8dp">
+    android:orientation="vertical">
 
-    <!-- 顶部配置行：波特率 + HEX开关 -->
-    <LinearLayout
+    <!-- Tab 切换 -->
+    <RadioGroup
+        android:id="@+id/tabGroup"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="wrap_content"
+        android:orientation="horizontal"
+        android:padding="6dp"
+        android:background="#FFFFFF">
+        <RadioButton
+            android:id="@+id/tabSerial"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="波特率:" />
-
-        <Spinner
-            android:id="@+id/spBaud"
-            android:layout_width="120dp"
-            android:layout_height="wrap_content" />
-
-        <CheckBox
-            android:id="@+id/chkRecvHex"
-            android:layout_width="wrap_content"
+            android:layout_weight="1"
+            android:checked="true"
+            android:button="@null"
+            android:gravity="center"
+            android:text="串口助手"/>
+        <RadioButton
+            android:id="@+id/tabMotor"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:text="HEX显示" />
+            android:layout_weight="1"
+            android:button="@null"
+            android:gravity="center"
+            android:text="电机控制"/>
+    </RadioGroup>
 
-        <CheckBox
-            android:id="@+id/chkSendHex"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="HEX发送" />
-    </LinearLayout>
-
-    <!-- 接收日志框 -->
-    <EditText
-        android:id="@+id/etReceive"
+    <!-- Fragment 容器 -->
+    <FrameLayout
+        android:id="@+id/fragmentContainer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:editable="false"
-        android:inputType="textMultiLine"
-        android:scrollbars="vertical"
-        android:textSize="14sp" />
-
-    <!-- 发送输入框 -->
-    <EditText
-        android:id="@+id/etSend"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="文本发送 / HEX输入示例 AA 01 02" />
-
-    <!-- 底部按钮行 -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <Button
-            android:id="@+id/btnOpen"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="打开串口" />
-
-        <Button
-            android:id="@+id/btnSend"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="发送" />
-
-        <Button
-            android:id="@+id/btnClear"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="清空" />
-
-        <Button
-            android:id="@+id/btnClose"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="关闭" />
-    </LinearLayout>
+        android:layout_weight="1"/>
 
 </LinearLayout>

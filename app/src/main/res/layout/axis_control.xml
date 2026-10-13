@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/card_bg"
+    android:padding="12dp"
+    android:layout_marginBottom="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+        <TextView
+            android:id="@+id/tvAxisTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textStyle="bold"
+            android:textSize="15sp"
+            android:textColor="#1C2530"
+            android:text="轴"/>
+        <TextView style="@style/FieldLabel" android:text="当前位置:" />
+        <EditText android:id="@+id/tvAxisPos" style="@style/FieldValue" android:enabled="false"/>
+        <Button style="@style/SmallBtn" android:id="@+id/btnGetPos" android:text="获取位置"/>
+        <Button style="@style/SmallBtn" android:id="@+id/btnReset" android:text="复位" android:layout_marginStart="4dp"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical">
+        <TextView style="@style/FieldLabel" android:text="设置位置:" />
+        <EditText android:id="@+id/edtSetPos" style="@style/FieldValue" android:hint="0"/>
+        <Button style="@style/SmallBtn" android:id="@+id/btnSetPos" android:text="设置位置"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical">
+        <TextView style="@style/FieldLabel" android:text="速度:" />
+        <EditText android:id="@+id/edtSpeed" style="@style/FieldValue" android:hint="800"/>
+        <Button style="@style/SmallBtn" android:id="@+id/btnRecur" android:text="往复运动"/>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical">
+        <TextView style="@style/FieldLabel" android:text="步距(um):" />
+        <EditText android:id="@+id/edtStepUm" style="@style/FieldValue" android:hint="1000"/>
+        <Button style="@style/SmallBtn" android:id="@+id/btnStepPlus" android:text="+"/>
+        <Button style="@style/SmallBtn" android:id="@+id/btnStepMinus" android:text="-" android:layout_marginStart="4dp"/>
+    </LinearLayout>
+
+</LinearLayout>

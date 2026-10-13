@@ -10,19 +10,20 @@ import android.hardware.usb.UsbManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.widget.ArrayAdapter
-import android.widget.Button
-import android.widget.CheckBox
-import android.widget.EditText
-import android.widget.Spinner
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
 import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
 import java.io.IOException
-import java.nio.charset.StandardCharsets
+import java.util.concurrent.CopyOnWriteArrayList
 
+/**
+ * Tab 宿主：串口助手 / 电机控制 两个页签，共享同一串口实例。
+ */
 class MainActivity : AppCompatActivity() {
 
     private lateinit var usbManager: UsbManager
@@ -31,17 +32,17 @@ class MainActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private val ACTION_USB_PERMISSION = "com.serialtool.USB_PERMISSION"
 
-    private lateinit var spBaud: Spinner
-    private lateinit var chkRecvHex: CheckBox
-    private lateinit var chkSendHex: CheckBox
-    private lateinit var etReceive: EditText
-    private lateinit var etSend: EditText
-    private lateinit var btnOpen: Button
-    private lateinit var btnSend: Button
-    private lateinit var btnClear: Button
-    private lateinit var btnClose: Button
+    // 目标 CDC 设备 VID/PID（0x19F5 / 0x5740）
+    private val targetVid = 0x19F5
+    private val targetPid = 0x5740
 
-    // USB 权限授权结果回调
+    // 接收分发
+    private val receiveListeners = CopyOnWriteArrayList<(ByteArray) -> Unit>()
+    private val statusCallbacks = CopyOnWriteArrayList<(String) -> Unit>()
+
+    private var serialFragment: SerialFragment? = null
+    private var motorFragment: MotorControlFragment? = null
+
     private val usbPermissionReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             if (ACTION_USB_PERMISSION == intent?.action) {
@@ -50,7 +51,7 @@ class MainActivity : AppCompatActivity() {
                 if (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)) {
                     device?.let { openSerial(it) }
                 } else {
-                    appendLog("❌ USB权限被拒绝")
+                    notifyStatus("❌ USB权限被拒绝")
                 }
             }
         }
@@ -60,183 +61,153 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-
-        spBaud = findViewById(R.id.spBaud)
-        chkRecvHex = findViewById(R.id.chkRecvHex)
-        chkSendHex = findViewById(R.id.chkSendHex)
-        etReceive = findViewById(R.id.etReceive)
-        etSend = findViewById(R.id.etSend)
-        btnOpen = findViewById(R.id.btnOpen)
-        btnSend = findViewById(R.id.btnSend)
-        btnClear = findViewById(R.id.btnClear)
-        btnClose = findViewById(R.id.btnClose)
-
-        // 波特率下拉
-        val baudList = listOf("9600", "19200", "38400", "115200")
-        spBaud.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, baudList)
-        spBaud.setSelection(3) // 默认 115200
-
-        btnOpen.setOnClickListener { scanAndRequestDevice() }
-        btnClose.setOnClickListener { closeSerial() }
-        btnClear.setOnClickListener { etReceive.text.clear() }
-        btnSend.setOnClickListener { sendData() }
+        setupTabs()
     }
 
-    // 目标 CDC 设备的 VID/PID（十六进制 0x19F5 / 0x5740）
-    private val targetVid = 0x19F5
-    private val targetPid = 0x5740
+    private fun setupTabs() {
+        val group = findViewById<RadioGroup>(R.id.tabGroup)
+        if (serialFragment == null) {
+            serialFragment = SerialFragment()
+            motorFragment = MotorControlFragment()
+            supportFragmentManager.beginTransaction()
+                .add(R.id.fragmentContainer, serialFragment!!, "serial")
+                .add(R.id.fragmentContainer, motorFragment!!, "motor")
+                .hide(motorFragment!!)
+                .commit()
+        }
+        group.setOnCheckedChangeListener { _, id ->
+            if (id == R.id.tabMotor) showFragment(motorFragment!!) else showFragment(serialFragment!!)
+        }
+    }
 
-    // 查找串口驱动：先走默认探测，探测不到再对目标设备强制使用 CDC 驱动
-    // 很多 CDC 虚拟串口枚举接口类型不标准（IAD/单接口），默认 CdcAcmSerialProber 探测不到
+    private fun showFragment(show: Fragment) {
+        val hide = if (show === serialFragment) motorFragment else serialFragment
+        supportFragmentManager.beginTransaction()
+            .show(show)
+            .hide(hide!!)
+            .commit()
+    }
+
+    // ========== 串口 API（供 Fragment 使用） ==========
+
+    fun isSerialOpen(): Boolean = serialPort?.isOpen ?: false
+
+    fun openSerialFromFragment(): Boolean {
+        if (serialPort?.isOpen == true) {
+            notifyStatus("串口已打开")
+            return true
+        }
+        val driver = findDriver() ?: run {
+            notifyStatus("❌ 未检测USB串口设备，请检查OTG/CH340")
+            return false
+        }
+        val device = driver.device
+        if (!usbManager.hasPermission(device)) {
+            val pi = PendingIntent.getBroadcast(
+                this, 0, Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE
+            )
+            registerReceiver(usbPermissionReceiver, IntentFilter(ACTION_USB_PERMISSION))
+            usbManager.requestPermission(device, pi)
+            notifyStatus("⚠️ 请在弹窗允许USB权限")
+            return false
+        }
+        return openSerial(device)
+    }
+
+    fun closeSerialFromFragment() {
+        readThread?.interrupt()
+        try { serialPort?.close() } catch (_: Exception) {}
+        serialPort = null
+        notifyStatus("串口已关闭")
+    }
+
+    fun sendBytes(data: ByteArray) {
+        if (serialPort?.isOpen != true) {
+            notifyStatus("⚠️ 串口未打开")
+            return
+        }
+        try {
+            serialPort?.write(data, 100)
+        } catch (e: Exception) {
+            notifyStatus("❌ 发送失败：${e.javaClass.simpleName}: ${e.message}")
+        }
+    }
+
+    fun addReceiveListener(l: (ByteArray) -> Unit) = receiveListeners.add(l)
+    fun removeReceiveListener(l: (ByteArray) -> Unit) = receiveListeners.remove(l)
+
+    fun addStatusCallback(cb: (String) -> Unit) = statusCallbacks.add(cb)
+    fun removeStatusCallback(cb: (String) -> Unit) = statusCallbacks.remove(cb)
+
+    private fun notifyStatus(msg: String) {
+        handler.post { statusCallbacks.forEach { it(msg) } }
+    }
+
+    // ========== 串口打开核心 ==========
+
     private fun findDriver(): UsbSerialDriver? {
         val defaultDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
         if (defaultDrivers.isNotEmpty()) return defaultDrivers[0]
-
         for (dev in usbManager.deviceList.values) {
             if (dev.vendorId == targetVid && dev.productId == targetPid) {
-                appendLog("⚠️ 默认探测未命中，强制使用 CdcAcmSerialDriver")
-                // 单参构造会对非标准 CDC 走 openSingleInterface 逻辑
+                notifyStatus("⚠️ 默认探测未命中，强制使用 CdcAcmSerialDriver")
                 return CdcAcmSerialDriver(dev)
             }
         }
         return null
     }
 
-    // 扫描 USB 串口设备并申请权限
-    private fun scanAndRequestDevice() {
-        val driver = findDriver() ?: run {
-            appendLog("❌ 未检测USB串口设备，请检查OTG/CH340")
-            return
-        }
-        val device = driver.device
-        if (!usbManager.hasPermission(device)) {
-            val pi: PendingIntent = PendingIntent.getBroadcast(
-                this, 0, Intent(ACTION_USB_PERMISSION), PendingIntent.FLAG_MUTABLE
-            )
-            registerReceiver(usbPermissionReceiver, IntentFilter(ACTION_USB_PERMISSION))
-            usbManager.requestPermission(device, pi)
-            appendLog("⚠️ 请允许USB权限弹窗")
-        } else {
-            openSerial(device)
-        }
-    }
-
-    // 打开串口并启动接收线程
-    private fun openSerial(device: UsbDevice) {
-        val driver = findDriver()
-        if (driver == null) {
-            appendLog("❌ 找不到串口驱动")
-            return
-        }
+    private fun openSerial(device: UsbDevice): Boolean {
+        val driver = findDriver() ?: return false
         val port = driver.ports[0]
         try {
             val connection = usbManager.openDevice(driver.device)
             if (connection == null) {
-                appendLog("❌ openDevice返回null，设备可能被占用或已断开")
-                return
+                notifyStatus("❌ openDevice返回null，设备可能被占用或已断开")
+                return false
             }
             port.open(connection)
-            val baud = spBaud.selectedItem.toString().toInt()
-            port.setParameters(baud, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-
-            // CDC 虚拟串口关键：设置 DTR/RTS 控制线，很多 CDC 设备（如 STM32 VCP）不拉高就不工作
+            port.setParameters(115200, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
             try {
                 port.setDTR(true)
                 port.setRTS(true)
             } catch (ce: Exception) {
-                appendLog("⚠️ 控制线设置提示：${ce.javaClass.simpleName}: ${ce.message}")
+                notifyStatus("⚠️ 控制线设置提示：${ce.javaClass.simpleName}: ${ce.message}")
             }
-
             serialPort = port
-            appendLog("✅ 串口打开成功，波特率 $baud（驱动 ${driver.javaClass.simpleName}）")
+            notifyStatus("✅ 串口打开成功（驱动 ${driver.javaClass.simpleName}）")
+            startReadThread()
+            return true
+        } catch (e: Exception) {
+            notifyStatus("❌ 打开失败：${e.javaClass.simpleName}: ${e.message}")
+            try { port.close() } catch (_: Exception) {}
+            return false
+        }
+    }
 
-            // 接收线程：仅真断开(IOException)时退出，超时/空数据继续轮询
-            readThread = Thread {
-                val buf = ByteArray(1024)
-                while (!Thread.currentThread().isInterrupted) {
-                    try {
-                        val len = serialPort?.read(buf, 200) ?: -1
-                        if (len > 0) {
-                            val data = buf.copyOfRange(0, len)
-                            handler.post {
-                                if (chkRecvHex.isChecked) {
-                                    appendLog(bytesToHex(data))
-                                } else {
-                                    appendLog(String(data, StandardCharsets.UTF_8))
-                                }
-                            }
-                        }
-                    } catch (e: IOException) {
-                        handler.post { appendLog("⚠️ 串口已断开：${e.message}") }
-                        break
-                    } catch (e: Exception) {
-                        try { Thread.sleep(20) } catch (_: InterruptedException) { break }
+    private fun startReadThread() {
+        readThread = Thread {
+            val buf = ByteArray(1024)
+            while (!Thread.currentThread().isInterrupted) {
+                try {
+                    val len = serialPort?.read(buf, 200) ?: -1
+                    if (len > 0) {
+                        val data = buf.copyOfRange(0, len)
+                        handler.post { receiveListeners.forEach { it(data) } }
                     }
+                } catch (e: IOException) {
+                    break
+                } catch (e: Exception) {
+                    try { Thread.sleep(20) } catch (_: InterruptedException) { break }
                 }
             }
-            readThread?.start()
-        } catch (e: Exception) {
-            appendLog("❌ 打开失败：${e.javaClass.simpleName}: ${e.message}")
-            try { port.close() } catch (_: Exception) {}
         }
-    }
-
-    private fun closeSerial() {
-        readThread?.interrupt()
-        try {
-            serialPort?.close()
-        } catch (_: Exception) {
-        }
-        serialPort = null
-        appendLog("✅ 串口已关闭")
-    }
-
-    private fun sendData() {
-        val text = etSend.text.toString().trim()
-        if (text.isEmpty()) return
-        if (serialPort == null) {
-            appendLog("⚠️ 串口未打开")
-            return
-        }
-        val payload: ByteArray
-        if (chkSendHex.isChecked) {
-            payload = hexToBytes(text) ?: run {
-                appendLog("❌ HEX格式错误，示例 01 02 03")
-                return
-            }
-            appendLog(">>> HEX: ${bytesToHex(payload)}")
-        } else {
-            payload = text.toByteArray(StandardCharsets.UTF_8)
-            appendLog(">>> TXT: $text")
-        }
-        try {
-            serialPort?.write(payload, 100)
-        } catch (e: Exception) {
-            appendLog("❌ 发送失败：${e.javaClass.simpleName}: ${e.message}")
-        }
-    }
-
-    private fun appendLog(msg: String) {
-        etReceive.append("$msg\n")
-        val layout = etReceive.layout ?: return
-        val scrollY = layout.getLineTop(layout.lineCount - 1)
-        etReceive.scrollTo(0, scrollY)
-    }
-
-    private fun bytesToHex(data: ByteArray): String =
-        data.joinToString(" ") { String.format("%02X", it) }
-
-    private fun hexToBytes(s: String): ByteArray? = try {
-        s.split(" ")
-            .filter { it.isNotEmpty() }
-            .map { it.toInt(16).toByte() }
-            .toByteArray()
-    } catch (_: Exception) {
-        null
+        readThread?.start()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        closeSerial()
+        readThread?.interrupt()
+        try { serialPort?.close() } catch (_: Exception) {}
     }
 }
