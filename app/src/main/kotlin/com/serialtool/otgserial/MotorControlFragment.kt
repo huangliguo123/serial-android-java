@@ -203,12 +203,15 @@ class MotorControlFragment : Fragment() {
     private fun sendSetConfig() {
         val key = cfgAxisKey()
         val motorId = axisParams[key]!!.config
-        val start = edtSetStart.text.toString().toIntOrNull() ?: 0
-        val acc = edtSetAcc.text.toString().toIntOrNull() ?: 0
-        val dec = edtSetDec.text.toString().toIntOrNull() ?: 0
-        val stop = edtSetStop.text.toString().toIntOrNull() ?: 0
+        val start = edtSetStart.text.toString().toIntOrNull() ?: 400
+        val acc = edtSetAcc.text.toString().toIntOrNull() ?: 400
+        val dec = edtSetDec.text.toString().toIntOrNull() ?: 400
+        val stop = edtSetStop.text.toString().toIntOrNull() ?: 400
         mainActivity().sendBytes(MotorProtocol.setMotorParam(motorId, start, acc, dec, stop))
         log("下发 ${axisParams[key]!!.display} 配置 启速$start 加速$acc 减速$dec 停速$stop")
+        // 下发后自动回读配置确认（与PC工具一致）
+        mainActivity().sendBytes(MotorProtocol.getConfigFrame(motorId))
+        log("已请求回读配置")
     }
 
     private fun sendGetPos(key: String) {

@@ -89,9 +89,9 @@
                 android:orientation="horizontal"
                 android:layout_marginTop="6dp">
                 <TextView style="@style/FieldLabel" android:text="设加速度:" />
-                <EditText android:id="@+id/edtSetAcc" style="@style/FieldValue" android:hint="400"/>
+                <EditText android:id="@+id/edtSetAcc" style="@style/FieldValue" android:text="400"/>
                 <TextView style="@style/FieldLabel" android:text="设减速度:" android:layout_marginStart="10dp"/>
-                <EditText android:id="@+id/edtSetDec" style="@style/FieldValue" android:hint="400"/>
+                <EditText android:id="@+id/edtSetDec" style="@style/FieldValue" android:text="400"/>
             </LinearLayout>
 
             <LinearLayout
@@ -100,9 +100,9 @@
                 android:orientation="horizontal"
                 android:layout_marginTop="6dp">
                 <TextView style="@style/FieldLabel" android:text="设启速:" />
-                <EditText android:id="@+id/edtSetStart" style="@style/FieldValue" android:hint="400"/>
+                <EditText android:id="@+id/edtSetStart" style="@style/FieldValue" android:text="400"/>
                 <TextView style="@style/FieldLabel" android:text="设停速:" android:layout_marginStart="10dp"/>
-                <EditText android:id="@+id/edtSetStop" style="@style/FieldValue" android:hint="400"/>
+                <EditText android:id="@+id/edtSetStop" style="@style/FieldValue" android:text="400"/>
             </LinearLayout>
 
             <LinearLayout
