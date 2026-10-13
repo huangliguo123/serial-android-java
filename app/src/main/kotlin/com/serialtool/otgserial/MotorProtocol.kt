@@ -5,12 +5,15 @@ import java.nio.charset.StandardCharsets
 /**
  * 镜头电机驱动板串口协议。
  *
- * 帧格式（十六进制，5f 结尾）：
+ * 发送帧（5f 结尾）:
  *   简单命令:  55 <cmd> 5f                     如 55 0b 5f（查AP位置）
  *   带数据命令: 55 <cmd> <len> <payload> <crc> 5f
  * CRC = 对 body（cmd 到 payload 末尾）逐字节异或。
  *
- * 返回帧假设与发送同构：55 <cmd> <len> <payload> <crc> 5f，payload 为 ASCII 文本。
+ * 返回帧（aa 头，靠 len 定边界，无 5f 尾）:
+ *   aa <id> <len> <payload> <crc>
+ *   id = 命令码（0b/0c/11=位置, 1b=配置, 16/17/18=配置CRC, 01=版本, 1a/1c=曲线）
+ *   crc = 对 [id, len, payload...] 逐字节异或；payload 为 ASCII 文本。
  */
 object MotorProtocol {
 
@@ -89,47 +92,59 @@ object MotorProtocol {
     }
 
     /**
-     * 从累积缓冲中提取完整帧（55 ... 5f）。
-     * @param buffer 可变缓冲，解析后已消费的字节会被移除
+     * 从累积缓冲中提取完整返回帧（aa 头）。
+     * 返回帧格式: aa <id> <len> <payload> <crc>
+     *   crc = 对 [id, len, payload...] 逐字节异或
+     * @param buffer 可变缓冲，解析后已消费的字节会被移除（未完成的半帧保留，待下次拼接）
      * @return 提取到的帧列表
      */
     fun extractFrames(buffer: MutableList<Byte>): List<Frame> {
         val frames = ArrayList<Frame>()
-        while (true) {
-            // 找帧头 55
-            val start = indexOf(buffer, 0x55)
-            if (start < 0) { buffer.clear(); break }
-            if (start > 0) {
-                repeat(start) { buffer.removeAt(0) }
-            }
-            // 找帧尾 5f
-            val end = indexOf(buffer, 0x5f)
-            if (end < 0) break // 半帧，等待更多数据
-            // 完整帧: buffer[0..end]
-            val frame = buffer.subList(0, end + 1).toList().toByteArray()
-            if (frame.size >= 3) {
-                val cmd = frame[1].toInt() and 0xff
-                val payload = if (frame.size >= 5) {
-                    val len = frame[2].toInt() and 0xff
-                    if (len > 0 && 3 + len <= frame.size - 2) {
-                        frame.copyOfRange(3, 3 + len)
-                    } else {
-                        // len 不可信，取 3 到 倒数第二（跳过 crc）
-                        frame.copyOfRange(3, frame.size - 2)
-                    }
-                } else {
-                    ByteArray(0)
+        synchronized(buffer) {
+            var consumed = 0
+            var i = 0
+            while (i < buffer.size) {
+                if ((buffer[i].toInt() and 0xff) != 0xaa) {
+                    // 非帧头，向后找 aa
+                    i++
+                    consumed = i
+                    continue
                 }
-                frames.add(Frame(cmd, payload))
+                // 至少还需 id + len 两个字节
+                if (i + 2 >= buffer.size) {
+                    consumed = i
+                    break // 半帧，等更多数据
+                }
+                val id = buffer[i + 1].toInt() and 0xff
+                val len = buffer[i + 2].toInt() and 0xff
+                val total = 4 + len // aa + id + len + payload + crc
+                if (i + total > buffer.size) {
+                    consumed = i // 保留该 aa 起未完成的帧
+                    break
+                }
+                // CRC 校验：对 [id, len, payload...] 逐字节异或
+                var crc = 0
+                for (j in 1 until total - 1) {
+                    crc = crc xor (buffer[i + j].toInt() and 0xff)
+                }
+                val bufCrc = buffer[i + total - 1].toInt() and 0xff
+                if (crc != bufCrc) {
+                    i++
+                    consumed = i
+                    continue // CRC 失败，跳过该 aa
+                }
+                val payload = ByteArray(len)
+                for (j in 0 until len) payload[j] = buffer[i + 3 + j]
+                frames.add(Frame(id, payload))
+                i += total
+                consumed = i
             }
-            repeat(end + 1) { buffer.removeAt(0) }
+            // 移除已消费的前缀
+            if (consumed > 0) {
+                repeat(consumed) { buffer.removeAt(0) }
+            }
         }
         return frames
-    }
-
-    private fun indexOf(list: List<Byte>, value: Int): Int {
-        for (i in list.indices) if ((list[i].toInt() and 0xff) == value) return i
-        return -1
     }
 
     /** payload 按 ASCII 解码 */
