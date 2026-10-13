@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 简易串口图标：蓝色圆角背景 + 白色USB/信号符号 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 背景圆角矩形 -->
+    <path
+        android:fillColor="#1E6FE0"
+        android:pathData="M20,0 L88,0 A20,20 0 0 1 108,20 L108,88 A20,20 0 0 1 88,108 L20,108 A20,20 0 0 1 0,88 L0,20 A20,20 0 0 1 20,0 Z" />
+
+    <!-- 串口 DB9 风格方块 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,34 h40 a4,4 0 0 1 4,4 v32 a4,4 0 0 1 -4,4 h-40 a4,4 0 0 1 -4,-4 v-32 a4,4 0 0 1 4,-4 Z" />
+
+    <!-- 三根引脚线 -->
+    <path
+        android:strokeColor="#1E6FE0"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M44,40 L44,68 M54,40 L54,68 M64,40 L64,68" />
+</vector>

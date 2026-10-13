@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- CH340 / CH341 系列: 0x1A86:0x7523 -->
+    <usb-device vendor-id="6790" product-id="29987"/>
+
+    <!-- CP2102 / CP210x 系列: 0x10C4:0xEA60 -->
+    <usb-device vendor-id="4260" product-id="60064"/>
+
+    <!-- FTDI FT232 系列: 0x0403:0x6001 -->
+    <usb-device vendor-id="1027" product-id="24577"/>
+
+    <!-- PL2303 系列: 0x067B:0x2303 -->
+    <usb-device vendor-id="1659" product-id="8963"/>
+</resources>
