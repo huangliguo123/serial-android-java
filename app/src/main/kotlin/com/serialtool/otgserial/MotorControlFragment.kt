@@ -63,10 +63,12 @@ class MotorControlFragment : Fragment() {
     )
 
     // 各轴参数: key -> (显示名, 设置步id, 查询位置id, 配置轴id)
+    data class AxisParam(val display: String, val setStep: String, val getPos: String, val config: String)
+
     private val axisParams = mapOf(
-        "ap"  to Triple("AP", "13", "0b", "00"),
-        "af1" to Triple("AF1", "14", "0c", "01"),
-        "af2" to Triple("AF2", "15", "11", "02")
+        "ap"  to AxisParam("AP", "13", "0b", "00"),
+        "af1" to AxisParam("AF1", "14", "0c", "01"),
+        "af2" to AxisParam("AF2", "15", "11", "02")
     )
 
     private fun mainActivity(): MainActivity = activity as MainActivity
@@ -118,7 +120,7 @@ class MotorControlFragment : Fragment() {
             card.findViewById(R.id.btnStepPlus),
             card.findViewById(R.id.btnStepMinus)
         )
-        ui.title.text = p.first
+        ui.title.text = p.display
         ui.edtSpeed.setText("800")
         ui.edtStepUm.setText("1000")
         axes[key] = ui
@@ -171,7 +173,7 @@ class MotorControlFragment : Fragment() {
             val p = axisParams[key]!!
             ui.btnGetPos.setOnClickListener { sendGetPos(key) }
             ui.btnSetPos.setOnClickListener { sendSetPos(key) }
-            ui.btnReset.setOnClickListener { mainActivity().sendBytes(MotorProtocol.resetFrame()); log("${p.first} 复位") }
+            ui.btnReset.setOnClickListener { mainActivity().sendBytes(MotorProtocol.resetFrame()); log("${p.display} 复位") }
             ui.btnStepPlus.setOnClickListener { stepPos(key, 1) }
             ui.btnStepMinus.setOnClickListener { stepPos(key, -1) }
             ui.btnRecur.setOnClickListener { toggleRecur(key, ui) }
@@ -188,29 +190,29 @@ class MotorControlFragment : Fragment() {
 
     private fun cfgAxisKey(): String {
         val name = spConfigAxis.selectedItem?.toString() ?: "AP"
-        return axisParams.entries.firstOrNull { it.value.first == name }?.key ?: "ap"
+        return axisParams.entries.firstOrNull { it.value.display == name }?.key ?: "ap"
     }
 
     private fun sendGetConfig() {
         val key = cfgAxisKey()
-        val axis = axisParams[key]!!.third
+        val axis = axisParams[key]!!.config
         mainActivity().sendBytes(MotorProtocol.getConfigFrame(axis))
-        log("获取 ${axisParams[key]!!.first} 配置")
+        log("获取 ${axisParams[key]!!.display} 配置")
     }
 
     private fun sendSetConfig() {
         val key = cfgAxisKey()
-        val motorId = axisParams[key]!!.third
+        val motorId = axisParams[key]!!.config
         val start = edtSetStart.text.toString().toIntOrNull() ?: 0
         val acc = edtSetAcc.text.toString().toIntOrNull() ?: 0
         val dec = edtSetDec.text.toString().toIntOrNull() ?: 0
         val stop = edtSetStop.text.toString().toIntOrNull() ?: 0
         mainActivity().sendBytes(MotorProtocol.setMotorParam(motorId, start, acc, dec, stop))
-        log("下发 ${axisParams[key]!!.first} 配置 启速$start 加速$acc 减速$dec 停速$stop")
+        log("下发 ${axisParams[key]!!.display} 配置 启速$start 加速$acc 减速$dec 停速$stop")
     }
 
     private fun sendGetPos(key: String) {
-        val posId = axisParams[key]!!.second
+        val posId = axisParams[key]!!.getPos
         mainActivity().sendBytes(MotorProtocol.getPosFrame(posId))
     }
 
@@ -221,8 +223,8 @@ class MotorControlFragment : Fragment() {
         val limited = motorConfig.limit(raw, key)
         val speed = ui.edtSpeed.text.toString().toIntOrNull() ?: 800
         ui.edtSetPos.setText(limited.toString())
-        mainActivity().sendBytes(MotorProtocol.setMotorStep(p.second, limited, speed))
-        log("${p.first} 设置位置 $limited 速度 $speed")
+        mainActivity().sendBytes(MotorProtocol.setMotorStep(p.setStep, limited, speed))
+        log("${p.display} 设置位置 $limited 速度 $speed")
     }
 
     private fun stepPos(key: String, dir: Int) {
@@ -234,8 +236,8 @@ class MotorControlFragment : Fragment() {
         val newPos = motorConfig.limit(cur + dir * step, key)
         ui.edtSetPos.setText(newPos.toString())
         val speed = ui.edtSpeed.text.toString().toIntOrNull() ?: 800
-        mainActivity().sendBytes(MotorProtocol.setMotorStep(p.second, newPos, speed))
-        log("${p.first} ${if (dir > 0) "+" else "-"}${step} 步 → $newPos")
+        mainActivity().sendBytes(MotorProtocol.setMotorStep(p.setStep, newPos, speed))
+        log("${p.display} ${if (dir > 0) "+" else "-"}${step} 步 → $newPos")
     }
 
     private fun toggleRecur(key: String, ui: AxisUi) {
@@ -245,14 +247,14 @@ class MotorControlFragment : Fragment() {
             recurThread?.interrupt()
             recurThread = null
             ui.btnRecur.text = "往复运动"
-            log("${axisParams[key]!!.first} 往复已停止")
+            log("${axisParams[key]!!.display} 往复已停止")
         } else {
             recurFlag[key] = 1
             recurDelayCount[key] = 0
             recurRunning.set(true)
             val speed = ui.edtSpeed.text.toString().toIntOrNull() ?: 800
             ui.btnRecur.text = "停止"
-            log("${axisParams[key]!!.first} 往复启动 速度$speed")
+            log("${axisParams[key]!!.display} 往复启动 速度$speed")
             startRecurThread(key, ui, speed)
         }
     }
@@ -262,9 +264,9 @@ class MotorControlFragment : Fragment() {
             val p = axisParams[key]!!
             while (recurRunning.get()) {
                 // 查询当前位置
-                mainActivity().sendBytes(MotorProtocol.getPosFrame(p.second))
+                mainActivity().sendBytes(MotorProtocol.getPosFrame(p.getPos))
                 try { Thread.sleep(100) } catch (_: InterruptedException) { break }
-                doRecurStep(key, ui, speed, p.second)
+                doRecurStep(key, ui, speed, p.setStep)
             }
         }
         recurThread?.start()
