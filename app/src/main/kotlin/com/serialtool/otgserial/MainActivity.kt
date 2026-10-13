@@ -19,6 +19,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 class MainActivity : AppCompatActivity() {
@@ -112,18 +113,31 @@ class MainActivity : AppCompatActivity() {
         val port = driver.ports[0]
         try {
             val connection = usbManager.openDevice(driver.device)
+            if (connection == null) {
+                appendLog("❌ openDevice返回null，设备可能被占用或已断开")
+                return
+            }
             port.open(connection)
             val baud = spBaud.selectedItem.toString().toInt()
             port.setParameters(baud, 8, UsbSerialPort.STOPBITS_1, UsbSerialPort.PARITY_NONE)
-            serialPort = port
-            appendLog("✅ 串口打开成功，波特率 $baud")
 
-            // 接收线程
+            // CDC 虚拟串口关键：设置 DTR/RTS 控制线，很多 CDC 设备（如 STM32 VCP）不拉高就不工作
+            try {
+                port.setDTR(true)
+                port.setRTS(true)
+            } catch (ce: Exception) {
+                appendLog("⚠️ 控制线设置提示：${ce.javaClass.simpleName}: ${ce.message}")
+            }
+
+            serialPort = port
+            appendLog("✅ 串口打开成功，波特率 $baud（驱动 ${driver.javaClass.simpleName}）")
+
+            // 接收线程：仅真断开(IOException)时退出，超时/空数据继续轮询
             readThread = Thread {
-                val buf = ByteArray(256)
+                val buf = ByteArray(1024)
                 while (!Thread.currentThread().isInterrupted) {
                     try {
-                        val len = serialPort?.read(buf, 100) ?: 0
+                        val len = serialPort?.read(buf, 200) ?: -1
                         if (len > 0) {
                             val data = buf.copyOfRange(0, len)
                             handler.post {
@@ -134,14 +148,18 @@ class MainActivity : AppCompatActivity() {
                                 }
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (e: IOException) {
+                        handler.post { appendLog("⚠️ 串口已断开：${e.message}") }
                         break
+                    } catch (e: Exception) {
+                        try { Thread.sleep(20) } catch (_: InterruptedException) { break }
                     }
                 }
             }
             readThread?.start()
         } catch (e: Exception) {
-            appendLog("❌ 打开失败：${e.message}")
+            appendLog("❌ 打开失败：${e.javaClass.simpleName}: ${e.message}")
+            try { port.close() } catch (_: Exception) {}
         }
     }
 
@@ -176,7 +194,7 @@ class MainActivity : AppCompatActivity() {
         try {
             serialPort?.write(payload, 100)
         } catch (e: Exception) {
-            appendLog("❌ 发送失败：${e.message}")
+            appendLog("❌ 发送失败：${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
