@@ -16,6 +16,7 @@ import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
+import com.hoho.android.usbserial.driver.CdcAcmSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialDriver
 import com.hoho.android.usbserial.driver.UsbSerialPort
 import com.hoho.android.usbserial.driver.UsbSerialProber
@@ -81,15 +82,32 @@ class MainActivity : AppCompatActivity() {
         btnSend.setOnClickListener { sendData() }
     }
 
+    // 目标 CDC 设备的 VID/PID（十六进制 0x19F5 / 0x5740）
+    private val targetVid = 0x19F5
+    private val targetPid = 0x5740
+
+    // 查找串口驱动：先走默认探测，探测不到再对目标设备强制使用 CDC 驱动
+    // 很多 CDC 虚拟串口枚举接口类型不标准（IAD/单接口），默认 CdcAcmSerialProber 探测不到
+    private fun findDriver(): UsbSerialDriver? {
+        val defaultDrivers = UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
+        if (defaultDrivers.isNotEmpty()) return defaultDrivers[0]
+
+        for (dev in usbManager.deviceList.values) {
+            if (dev.vendorId == targetVid && dev.productId == targetPid) {
+                appendLog("⚠️ 默认探测未命中，强制使用 CdcAcmSerialDriver")
+                // 单参构造会对非标准 CDC 走 openSingleInterface 逻辑
+                return CdcAcmSerialDriver(dev)
+            }
+        }
+        return null
+    }
+
     // 扫描 USB 串口设备并申请权限
     private fun scanAndRequestDevice() {
-        val availableDrivers: List<UsbSerialDriver> =
-            UsbSerialProber.getDefaultProber().findAllDrivers(usbManager)
-        if (availableDrivers.isEmpty()) {
+        val driver = findDriver() ?: run {
             appendLog("❌ 未检测USB串口设备，请检查OTG/CH340")
             return
         }
-        val driver = availableDrivers[0]
         val device = driver.device
         if (!usbManager.hasPermission(device)) {
             val pi: PendingIntent = PendingIntent.getBroadcast(
@@ -105,7 +123,7 @@ class MainActivity : AppCompatActivity() {
 
     // 打开串口并启动接收线程
     private fun openSerial(device: UsbDevice) {
-        val driver: UsbSerialDriver? = UsbSerialProber.getDefaultProber().probeDevice(device)
+        val driver = findDriver()
         if (driver == null) {
             appendLog("❌ 找不到串口驱动")
             return
