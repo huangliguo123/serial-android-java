@@ -11,4 +11,22 @@
 
     <!-- PL2303 系列: 0x067B:0x2303 -->
     <usb-device vendor-id="1659" product-id="8963"/>
+
+    <!-- ===== USB CDC 虚拟串口设备（通用CDC/ACM驱动） ===== -->
+
+    <!-- STMicroelectronics STM32 Virtual COM Port: 0x0483:0x5740 -->
+    <usb-device vendor-id="1155" product-id="22336"/>
+
+    <!-- 树莓派 Pico / RP2040 CDC: 0x2E8A:0x000A 和 0x2E8A:0x0005 -->
+    <usb-device vendor-id="11914" product-id="10"/>
+    <usb-device vendor-id="11914" product-id="5"/>
+
+    <!-- Arduino Leonardo/Micro (ATmega32U4 CDC): 0x2341:0x8036 -->
+    <usb-device vendor-id="9025" product-id="32822"/>
+
+    <!-- 乐鑫 ESP32-S2/S3 (USB CDC): 0x303A:0x1001 -->
+    <usb-device vendor-id="12346" product-id="4097"/>
+
+    <!-- 用户 USB CDC 设备: 0x19F5:0x5740 -->
+    <usb-device vendor-id="6645" product-id="22336"/>
 </resources>
