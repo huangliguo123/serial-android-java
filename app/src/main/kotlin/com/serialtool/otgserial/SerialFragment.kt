@@ -67,6 +67,11 @@ class SerialFragment : Fragment() {
         mainActivity().removeStatusCallback(statusCb)
     }
 
+    /** Tab 切换时同步前台状态（show/hide 不触发 onResume/onPause）。 */
+    fun setShown(shown: Boolean) {
+        visible = shown
+    }
+
     private fun onReceive(data: ByteArray) {
         if (!visible) return
         val disp = if (chkRecvHex.isChecked) bytesToHex(data)

@@ -388,9 +388,11 @@ class MotorControlFragment : Fragment() {
                 curveBuf2.add(curveBuf2.lastOrNull() ?: v)
             }
         }
-        // 限制长度，保留最新
-        while (curveBuf1.size > curveMaxPoints) curveBuf1.removeAt(0)
-        while (curveBuf2.size > curveMaxPoints) curveBuf2.removeAt(0)
+        // 限制长度，保留最新（批量移除，避免 O(n²) 卡顿）
+        val over1 = curveBuf1.size - curveMaxPoints
+        if (over1 > 0) curveBuf1.subList(0, over1).clear()
+        val over2 = curveBuf2.size - curveMaxPoints
+        if (over2 > 0) curveBuf2.subList(0, over2).clear()
     }
 
     private fun curveData(): Pair<IntArray, IntArray>? {

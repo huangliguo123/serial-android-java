@@ -126,6 +126,9 @@ class MainActivity : AppCompatActivity() {
             .show(show)
             .hide(hide!!)
             .commit()
+        // show/hide 不触发 onResume/onPause，手动同步串口助手的前台状态，
+        // 使其在电机控制页工作时不再显示电机收发数据。
+        (serialFragment as? SerialFragment)?.setShown(show === serialFragment)
     }
 
     // ========== 串口 API（供 Fragment 使用） ==========
