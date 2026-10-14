@@ -48,6 +48,12 @@ class MotorControlFragment : Fragment() {
 
     private val axes = LinkedHashMap<String, AxisUi>()
 
+    // 曲线数据缓冲（1a=速度曲线双通道, 1c=传感器曲线单通道）
+    private val curveBuf1 = ArrayList<Int>()
+    private val curveBuf2 = ArrayList<Int>()
+    private val curveMaxPoints = 4000
+    private var curveDialog: CurveDialog? = null
+
     class AxisUi(
         val title: TextView,
         val tvPos: EditText,
@@ -162,12 +168,8 @@ class MotorControlFragment : Fragment() {
         view?.findViewById<Button>(R.id.btnGetConfig)?.setOnClickListener { sendGetConfig() }
         view?.findViewById<Button>(R.id.btnSetConfig)?.setOnClickListener { sendSetConfig() }
         view?.findViewById<Button>(R.id.btnImportJson)?.setOnClickListener { openImport() }
-        view?.findViewById<Button>(R.id.btnSpeedCurve)?.setOnClickListener {
-            mainActivity().sendBytes(MotorProtocol.curveFrame(true)); log("速度曲线已请求")
-        }
-        view?.findViewById<Button>(R.id.btnSensorCurve)?.setOnClickListener {
-            mainActivity().sendBytes(MotorProtocol.curveFrame(false)); log("传感器曲线已请求")
-        }
+        view?.findViewById<Button>(R.id.btnSpeedCurve)?.setOnClickListener { toggleCurve("speed") }
+        view?.findViewById<Button>(R.id.btnSensorCurve)?.setOnClickListener { toggleCurve("sensor") }
 
         axes.forEach { (key, ui) ->
             val p = axisParams[key]!!
@@ -330,8 +332,8 @@ class MotorControlFragment : Fragment() {
             0x17 -> log("AF1 配置CRC: ${MotorProtocol.payloadAscii(f.payload)}")
             0x18 -> log("AF2 配置CRC: ${MotorProtocol.payloadAscii(f.payload)}")
             0x01 -> log("MCU版本: ${MotorProtocol.payloadAscii(f.payload)}")
-            0x1a -> log("速度曲线数据 (${f.payload.size}B)")
-            0x1c -> log("传感器曲线数据 (${f.payload.size}B)")
+            0x1a -> appendCurve(f.payload, dual = true)   // 速度曲线：每2值一对 ch1/ch2
+            0x1c -> appendCurve(f.payload, dual = false)  // 传感器曲线：单通道，ch2 复制 ch1
         }
     }
 
@@ -349,6 +351,65 @@ class MotorControlFragment : Fragment() {
 
     private fun asciiInt(payload: ByteArray): Int =
         MotorProtocol.payloadAscii(payload).trim().toIntOrNull() ?: 0
+
+    // ========== 曲线数据 ==========
+
+    /** 解析曲线 payload：每 2 字节一个采样（16 位大端，0~4096）。 */
+    private fun appendCurve(payload: ByteArray, dual: Boolean) {
+        val vals = ArrayList<Int>()
+        var i = 0
+        while (i + 1 < payload.size) {
+            val v = ((payload[i].toInt() and 0xff) shl 8) or (payload[i + 1].toInt() and 0xff)
+            vals.add(v)
+            i += 2
+        }
+        if (dual) {
+            // 每 2 值一对 ch1/ch2
+            var k = 0
+            while (k + 1 < vals.size) {
+                curveBuf1.add(vals[k])
+                curveBuf2.add(vals[k + 1])
+                k += 2
+            }
+        } else {
+            // 单通道：ch1 取值，ch2 复制上一个（保持长度一致）
+            for (v in vals) {
+                curveBuf1.add(v)
+                curveBuf2.add(curveBuf2.lastOrNull() ?: v)
+            }
+        }
+        // 限制长度，保留最新
+        while (curveBuf1.size > curveMaxPoints) curveBuf1.removeAt(0)
+        while (curveBuf2.size > curveMaxPoints) curveBuf2.removeAt(0)
+    }
+
+    private fun curveData(): Pair<IntArray, IntArray>? {
+        if (curveBuf1.isEmpty()) return null
+        return Pair(curveBuf1.toIntArray(), curveBuf2.toIntArray())
+    }
+
+    /** 速度曲线/传感器曲线按钮：启动采集并弹窗显示；再点关闭。 */
+    private fun toggleCurve(type: String) {
+        val cur = curveDialog
+        if (cur != null && cur.isShowing) {
+            mainActivity().sendBytes(MotorProtocol.curveFrame(false))
+            cur.dismiss()
+            curveDialog = null
+            curveBuf1.clear()
+            curveBuf2.clear()
+            log("${if (type == "speed") "速度" else "传感器"}曲线已停止")
+            return
+        }
+        curveBuf1.clear()
+        curveBuf2.clear()
+        mainActivity().sendBytes(MotorProtocol.curveFrame(true))
+        val title = if (type == "speed") "速度曲线" else "传感器曲线"
+        curveDialog = CurveDialog(requireContext(), title, { curveData() }, {
+            curveBuf1.clear(); curveBuf2.clear()
+        })
+        curveDialog?.show()
+        log("$title 已启动")
+    }
 
     private fun log(msg: String) {
         view?.post { logView.append("$msg\n") }
@@ -390,6 +451,10 @@ class MotorControlFragment : Fragment() {
         recurRunning.set(false)
         recurThread?.interrupt()
         recurThread = null
+        curveDialog?.dismiss()
+        curveDialog = null
+        curveBuf1.clear()
+        curveBuf2.clear()
         mainActivity().removeReceiveListener(receiveListener)
         mainActivity().removeStatusCallback(statusCb)
     }
@@ -399,5 +464,7 @@ class MotorControlFragment : Fragment() {
         recurRunning.set(false)
         recurThread?.interrupt()
         recurThread = null
+        curveDialog?.dismiss()
+        curveDialog = null
     }
 }
