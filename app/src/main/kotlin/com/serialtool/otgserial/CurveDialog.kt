@@ -6,19 +6,26 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
 import android.view.WindowManager
+import android.widget.ArrayAdapter
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.Spinner
 import android.widget.TextView
 
 /**
- * 双通道曲线显示弹窗。定时（40ms）从 dataSource 拉最新数据绘制；
- * 提供 暂停/清空/关闭 按钮。
+ * 双通道曲线显示弹窗。
+ * - 40ms 定时从 dataSource 拉最新数据绘制；
+ * - 曲线支持手势缩放/平移，[自适应] 一键显示合适区域；
+ * - 内置电机快捷控制（选轴、设置位置+速度、复位），可边看波形边控电机。
  */
 class CurveDialog(
     context: Context,
     private val title: String,
     private val dataSource: () -> Pair<IntArray, IntArray>?,
-    private val onClear: () -> Unit
+    private val onClear: () -> Unit,
+    private val onSetPos: (String, Int, Int) -> Unit,
+    private val onReset: (String) -> Unit
 ) : Dialog(context) {
 
     private val curveView = CurveView(context)
@@ -46,33 +53,87 @@ class CurveDialog(
         }
 
         val tvTitle = TextView(context).apply {
-            text = title
-            textSize = 16f
-            setPadding(dp(2), dp(2), dp(2), dp(8))
+            text = "$title（双指缩放 / 拖动平移）"
+            textSize = 15f
+            setPadding(dp(2), dp(2), dp(2), dp(6))
         }
         root.addView(tvTitle)
 
         root.addView(curveView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(340)))
+            LinearLayout.LayoutParams.MATCH_PARENT, dp(300)))
 
+        // ---- 控制按钮行 ----
         val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val btnFit = Button(context).apply { text = "自适应" }
         val btnPause = Button(context).apply { text = "暂停" }
         val btnClear = Button(context).apply { text = "清空" }
         val btnClose = Button(context).apply { text = "关闭" }
+        bar.addView(btnFit)
         bar.addView(btnPause)
         bar.addView(btnClear)
         bar.addView(btnClose)
         root.addView(bar, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT))
 
-        setContentView(root)
-
+        btnFit.setOnClickListener { curveView.autoFit() }
         btnPause.setOnClickListener {
             paused = !paused
             btnPause.text = if (paused) "继续" else "暂停"
         }
         btnClear.setOnClickListener { onClear() }
         btnClose.setOnClickListener { dismiss() }
+
+        // ---- 电机快捷控制区 ----
+        val motorLabel = TextView(context).apply {
+            text = "电机控制（边看波形边作动）"
+            textSize = 14f
+            setPadding(dp(2), dp(10), dp(2), dp(4))
+        }
+        root.addView(motorLabel)
+
+        // 行1：轴 + 位置 + 速度
+        val row1 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val spAxis = Spinner(context).apply {
+            adapter = ArrayAdapter(context, android.R.layout.simple_spinner_item, arrayOf("AP", "AF1", "AF2"))
+        }
+        val edtPos = EditText(context).apply {
+            hint = "位置(um)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
+            textSize = 14f
+        }
+        val edtSpeed = EditText(context).apply {
+            hint = "速度"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            textSize = 14f
+        }
+        row1.addView(spAxis, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row1.addView(edtPos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row1.addView(edtSpeed, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(row1, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT))
+
+        // 行2：设置位置 + 复位
+        val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
+        val btnSetPos = Button(context).apply { text = "设置位置" }
+        val btnReset = Button(context).apply { text = "复位" }
+        row2.addView(btnSetPos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row2.addView(btnReset, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(row2, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT))
+
+        btnSetPos.setOnClickListener {
+            val axis = spAxis.selectedItem?.toString() ?: "AP"
+            val pos = edtPos.text.toString().toIntOrNull() ?: 0
+            val speed = edtSpeed.text.toString().toIntOrNull() ?: 800
+            onSetPos(axis, pos, speed)
+        }
+        btnReset.setOnClickListener {
+            val axis = spAxis.selectedItem?.toString() ?: "AP"
+            onReset(axis)
+        }
+
+        setContentView(root)
 
         window?.setLayout((context.resources.displayMetrics.widthPixels * 0.92f).toInt(),
             WindowManager.LayoutParams.WRAP_CONTENT)

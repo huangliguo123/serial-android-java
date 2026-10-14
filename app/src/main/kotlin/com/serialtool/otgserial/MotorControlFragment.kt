@@ -406,9 +406,12 @@ class MotorControlFragment : Fragment() {
         try { mainActivity().sendBytes(MotorProtocol.curveFrame(true)) } catch (_: Exception) {}
         val title = if (type == "speed") "速度曲线" else "传感器曲线"
         try {
-            curveDialog = CurveDialog(requireContext(), title, { curveData() }, {
-                curveBuf1.clear(); curveBuf2.clear()
-            })
+            curveDialog = CurveDialog(
+                requireContext(), title, { curveData() },
+                { curveBuf1.clear(); curveBuf2.clear() },
+                { axis, pos, speed -> sendCurveMotorPos(axis, pos, speed) },
+                { axis -> sendCurveReset(axis) }
+            )
             curveDialog?.show()
             log("$title 已启动")
             Toast.makeText(requireContext(), "$title 已打开", Toast.LENGTH_SHORT).show()
@@ -416,6 +419,23 @@ class MotorControlFragment : Fragment() {
             log("❌ 打开曲线失败：${e.message}")
             Toast.makeText(requireContext(), "打开曲线失败", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /** 曲线窗口内设置电机位置（按型号行程限幅）。 */
+    private fun sendCurveMotorPos(axis: String, pos: Int, speed: Int) {
+        val key = axisParams.entries.firstOrNull { it.value.display == axis }?.key ?: "ap"
+        val p = axisParams[key]!!
+        val limited = motorConfig.limit(pos, key)
+        mainActivity().sendBytes(MotorProtocol.setMotorStep(p.setStep, limited, speed))
+        log("曲线控制 ${p.display} 位置 $limited 速度 $speed")
+    }
+
+    /** 曲线窗口内复位电机。 */
+    private fun sendCurveReset(axis: String) {
+        val key = axisParams.entries.firstOrNull { it.value.display == axis }?.key ?: "ap"
+        val p = axisParams[key]!!
+        mainActivity().sendBytes(MotorProtocol.resetFrame())
+        log("曲线控制 ${p.display} 复位")
     }
 
     private fun log(msg: String) {
