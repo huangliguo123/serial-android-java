@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.Gravity
+import android.view.Window
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -45,7 +46,8 @@ class CurveDialog(
     private fun dp(v: Int) = (v * context.resources.displayMetrics.density).toInt()
 
     init {
-        setTitle(title)
+        // 隐藏系统标题栏，实现全屏曲线
+        window?.requestFeature(Window.FEATURE_NO_TITLE)
         setCanceledOnTouchOutside(false)
 
         val root = LinearLayout(context).apply {
@@ -152,9 +154,9 @@ class CurveDialog(
 
         setContentView(root)
 
-        // 固定高度（屏高 90%）：曲线用权重吃剩余空间，底部控件全部可见
-        window?.setLayout((context.resources.displayMetrics.widthPixels * 0.92f).toInt(),
-            (context.resources.displayMetrics.heightPixels * 0.9f).toInt())
+        // 全屏显示：曲线区域用权重吃满剩余空间，底部控件始终可见
+        window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+        window?.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN)
         window?.setGravity(Gravity.CENTER)
 
         handler.postDelayed(ticker, 40)

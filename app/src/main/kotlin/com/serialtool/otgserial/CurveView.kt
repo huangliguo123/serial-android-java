@@ -176,13 +176,43 @@ class CurveView @JvmOverloads constructor(
         val i0 = floor(x0).toInt().coerceIn(0, data.size - 1)
         val i1 = ceil(x1).toInt().coerceIn(0, data.size - 1)
         if (i1 < i0) return
+        val nVis = i1 - i0 + 1
+        val maxPts = w.toInt().coerceAtLeast(1)
         path.reset()
         var first = true
-        for (i in i0..i1) {
-            val px = ((i - x0) / spanX * w).toFloat()
-            val v = data[i].toFloat().coerceIn(y0, y1)
-            val py = h - (v - y0) / spanY * h
-            if (first) { path.moveTo(px, py); first = false } else path.lineTo(px, py)
+        if (nVis <= maxPts) {
+            // 点数不多：逐点绘制
+            for (i in i0..i1) {
+                val px = ((i - x0) / spanX * w).toFloat()
+                val py = h - (data[i].toFloat().coerceIn(y0, y1) - y0) / spanY * h
+                if (first) { path.moveTo(px, py); first = false } else path.lineTo(px, py)
+            }
+        } else {
+            // 点数多：分段 min-max 抽稀（保峰值、防卡顿）
+            val seg = nVis / maxPts
+            var s = 0
+            while (s < maxPts) {
+                val start = i0 + s * seg
+                val end = (start + seg).coerceAtMost(i1)
+                if (end > start) {
+                    var mn = data[start]
+                    var mx = data[start]
+                    for (j in start + 1..end) { val v = data[j]; if (v < mn) mn = v; if (v > mx) mx = v }
+                    val cx = (start + end) / 2.0
+                    val xa = ((cx - x0) / spanX * w).toFloat()
+                    val ymn = h - (mn.toFloat().coerceIn(y0, y1) - y0) / spanY * h
+                    val ymx = h - (mx.toFloat().coerceIn(y0, y1) - y0) / spanY * h
+                    if (first) {
+                        path.moveTo(xa, ymn)
+                        path.lineTo(xa, ymx)
+                        first = false
+                    } else {
+                        path.lineTo(xa, ymn)
+                        path.lineTo(xa, ymx)
+                    }
+                }
+                s++
+            }
         }
         canvas.drawPath(path, p)
     }

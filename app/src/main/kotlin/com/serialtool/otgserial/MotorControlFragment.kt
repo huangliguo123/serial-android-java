@@ -52,7 +52,7 @@ class MotorControlFragment : Fragment() {
     // 曲线数据缓冲（1a=速度曲线双通道, 1c=传感器曲线单通道）
     private val curveBuf1 = ArrayList<Int>()
     private val curveBuf2 = ArrayList<Int>()
-    private val curveMaxPoints = 4000
+    private val curveMaxPoints = 10000
     private var curveDialog: CurveDialog? = null
     // 曲线窗口内的往复运动
     private val curveRecurRunning = AtomicBoolean(false)
