@@ -54,6 +54,13 @@ class MotorControlFragment : Fragment() {
     private val curveBuf2 = ArrayList<Int>()
     private val curveMaxPoints = 4000
     private var curveDialog: CurveDialog? = null
+    // 曲线窗口内的往复运动
+    private val curveRecurRunning = AtomicBoolean(false)
+    private var curveRecurThread: Thread? = null
+    private var curveRecurAxis: String = "ap"
+    private var curveRecurCenter = 0
+    private var curveRecurStep = 0
+    private var curveRecurDelayCount = 0
 
     class AxisUi(
         val title: TextView,
@@ -293,12 +300,14 @@ class MotorControlFragment : Fragment() {
                 recurDelayCount[key] = 0
                 if (flag == 1) {
                     recurFlag[key] = 2
-                    val np = motorConfig.limit(target - step, key)
+                    // 先正向：目标 + 步距
+                    val np = motorConfig.limit(target + step, key)
                     updateSetPosOnUi(ui, np)
                     mainActivity().sendBytes(MotorProtocol.setMotorStep(stepId, np, speed))
                 } else {
                     recurFlag[key] = 1
-                    val np = motorConfig.limit(target + step, key)
+                    // 再反向：目标 - 步距
+                    val np = motorConfig.limit(target - step, key)
                     updateSetPosOnUi(ui, np)
                     mainActivity().sendBytes(MotorProtocol.setMotorStep(stepId, np, speed))
                 }
@@ -410,7 +419,8 @@ class MotorControlFragment : Fragment() {
                 requireContext(), title, { curveData() },
                 { curveBuf1.clear(); curveBuf2.clear() },
                 { axis, pos, speed -> sendCurveMotorPos(axis, pos, speed) },
-                { axis -> sendCurveReset(axis) }
+                { axis -> sendCurveReset(axis) },
+                { axis, center, step, speed -> toggleCurveRecur(axis, center, step, speed) }
             )
             curveDialog?.show()
             log("$title 已启动")
@@ -436,6 +446,69 @@ class MotorControlFragment : Fragment() {
         val p = axisParams[key]!!
         mainActivity().sendBytes(MotorProtocol.resetFrame())
         log("曲线控制 ${p.display} 复位")
+    }
+
+    /** 曲线窗口内往复运动（先正向再反向，围绕中心位置 ± 步距）。 */
+    private fun toggleCurveRecur(axis: String, center: Int, step: Int, speed: Int) {
+        val key = axisParams.entries.firstOrNull { it.value.display == axis }?.key ?: "ap"
+        if (curveRecurRunning.get()) {
+            curveRecurRunning.set(false)
+            curveRecurThread?.interrupt()
+            curveRecurThread = null
+            log("曲线往复已停止")
+            return
+        }
+        if (step <= 0) {
+            log("⚠️ 往复步距需 > 0")
+            Toast.makeText(requireContext(), "往复步距需 > 0", Toast.LENGTH_SHORT).show()
+            return
+        }
+        curveRecurAxis = key
+        curveRecurCenter = center
+        curveRecurStep = step
+        curveRecurDelayCount = 0
+        curveRecurRunning.set(true)
+        val p = axisParams[key]!!
+        log("曲线往复启动 ${p.display} 中心$center 步距$step 速度$speed")
+        startCurveRecurThread(key, speed)
+    }
+
+    private fun startCurveRecurThread(key: String, speed: Int) {
+        curveRecurThread = Thread {
+            val p = axisParams[key]!!
+            val stepId = p.setStep
+            val getPosId = p.getPos
+            val threshold = motorConfig.axis(key).threshold
+            val delayMs = edtRecurDelay.text.toString().toIntOrNull() ?: 500
+            var dir = 1 // 1 正向, 2 反向
+            var target = curveRecurCenter
+            // 先到中心
+            mainActivity().sendBytes(MotorProtocol.setMotorStep(stepId, target, speed))
+            while (curveRecurRunning.get()) {
+                mainActivity().sendBytes(MotorProtocol.getPosFrame(getPosId))
+                try { Thread.sleep(100) } catch (_: InterruptedException) { break }
+                val cur = positions[key] ?: continue
+                val center = curveRecurCenter
+                val step = curveRecurStep
+                if (Math.abs(target - cur) <= threshold) {
+                    curveRecurDelayCount++
+                    if (curveRecurDelayCount * 100 >= delayMs) {
+                        curveRecurDelayCount = 0
+                        if (dir == 1) {
+                            dir = 2
+                            target = motorConfig.limit(center + step, key) // 先正向
+                        } else {
+                            dir = 1
+                            target = motorConfig.limit(center - step, key) // 再反向
+                        }
+                        mainActivity().sendBytes(MotorProtocol.setMotorStep(stepId, target, speed))
+                    }
+                } else if (Math.abs(target - cur) >= step) {
+                    mainActivity().sendBytes(MotorProtocol.setMotorStep(stepId, target, speed))
+                }
+            }
+        }
+        curveRecurThread?.start()
     }
 
     private fun log(msg: String) {
@@ -478,6 +551,9 @@ class MotorControlFragment : Fragment() {
         recurRunning.set(false)
         recurThread?.interrupt()
         recurThread = null
+        curveRecurRunning.set(false)
+        curveRecurThread?.interrupt()
+        curveRecurThread = null
         curveDialog?.dismiss()
         curveDialog = null
         curveBuf1.clear()
@@ -491,6 +567,9 @@ class MotorControlFragment : Fragment() {
         recurRunning.set(false)
         recurThread?.interrupt()
         recurThread = null
+        curveRecurRunning.set(false)
+        curveRecurThread?.interrupt()
+        curveRecurThread = null
         curveDialog?.dismiss()
         curveDialog = null
     }

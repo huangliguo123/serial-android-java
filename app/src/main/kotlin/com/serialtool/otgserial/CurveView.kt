@@ -62,10 +62,15 @@ class CurveView @JvmOverloads constructor(
     private val scaleDetector = ScaleGestureDetector(context,
         object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
             override fun onScale(d: ScaleGestureDetector): Boolean {
-                val factor = d.scaleFactor
-                if (factor in 0.5f..2f) {
-                    zoomAt(d.focusX / width, d.focusY / height, factor)
-                }
+                // 分轴缩放：水平方向缩放 X，垂直方向缩放 Y，对角则同时缩放
+                val pf = d.previousSpan
+                val cf = d.currentSpan
+                if (pf <= 0f) return true
+                val total = cf / pf
+                if (total !in 0.5f..2f) return true
+                val xf = if (d.previousSpanX > 0f) d.currentSpanX / d.previousSpanX else total
+                val yf = if (d.previousSpanY > 0f) d.currentSpanY / d.previousSpanY else total
+                zoomAt(d.focusX / width, d.focusY / height, xf.coerceIn(0.5f, 2f), yf.coerceIn(0.5f, 2f))
                 return true
             }
         })
@@ -73,7 +78,8 @@ class CurveView @JvmOverloads constructor(
     private val gestureDetector = GestureDetector(context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-                panBy(-distanceX / width, distanceY / height)
+                // 波形跟随手指方向移动
+                panBy(distanceX / width, distanceY / height)
                 return true
             }
         })
@@ -121,15 +127,15 @@ class CurveView @JvmOverloads constructor(
         invalidate()
     }
 
-    /** 以画布比例焦点 (nx,ny) 为中心缩放 factor 倍。 */
-    private fun zoomAt(nx: Float, ny: Float, factor: Float) {
+    /** 以画布比例焦点 (nx,ny) 为中心，X 缩放 xf 倍、Y 缩放 yf 倍。 */
+    private fun zoomAt(nx: Float, ny: Float, xf: Float, yf: Float) {
         if (width <= 0 || height <= 0) return
-        val xf = x0 + nx * (x1 - x0)
-        val yf = y0 + (1f - ny) * (y1 - y0)
-        x0 = xf - (xf - x0) / factor
-        x1 = xf + (x1 - xf) / factor
-        y0 = yf - (yf - y0) / factor
-        y1 = yf + (y1 - yf) / factor
+        val xc = x0 + nx * (x1 - x0)
+        val yc = y0 + (1f - ny) * (y1 - y0)
+        x0 = xc - (xc - x0) / xf
+        x1 = xc + (x1 - xc) / xf
+        y0 = yc - (yc - y0) / yf
+        y1 = yc + (y1 - yc) / yf
         followTail = false
         invalidate()
     }
