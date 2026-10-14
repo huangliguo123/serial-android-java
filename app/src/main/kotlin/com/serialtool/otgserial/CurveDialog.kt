@@ -25,6 +25,17 @@ class CurveDialog(
     private val handler = Handler(Looper.getMainLooper())
     private var paused = false
 
+    private val ticker = object : Runnable {
+        override fun run() {
+            if (!paused) {
+                dataSource()?.let { curveView.setData(it.first, it.second, true) }
+            }
+            handler.postDelayed(this, 40)
+        }
+    }
+
+    private fun dp(v: Int) = (v * context.resources.displayMetrics.density).toInt()
+
     init {
         setTitle(title)
         setCanceledOnTouchOutside(false)
@@ -63,22 +74,11 @@ class CurveDialog(
         btnClear.setOnClickListener { onClear() }
         btnClose.setOnClickListener { dismiss() }
 
-        window?.setLayout((resources.displayMetrics.widthPixels * 0.92f).toInt(),
+        window?.setLayout((context.resources.displayMetrics.widthPixels * 0.92f).toInt(),
             WindowManager.LayoutParams.WRAP_CONTENT)
         window?.setGravity(Gravity.CENTER)
 
         handler.postDelayed(ticker, 40)
-    }
-
-    private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
-
-    private val ticker = object : Runnable {
-        override fun run() {
-            if (!paused) {
-                dataSource()?.let { curveView.setData(it.first, it.second, true) }
-            }
-            handler.postDelayed(this, 40)
-        }
     }
 
     override fun dismiss() {
