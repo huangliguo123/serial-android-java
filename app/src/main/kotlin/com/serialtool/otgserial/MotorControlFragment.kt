@@ -9,6 +9,7 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.Spinner
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import java.util.Collections
@@ -392,7 +393,7 @@ class MotorControlFragment : Fragment() {
     private fun toggleCurve(type: String) {
         val cur = curveDialog
         if (cur != null && cur.isShowing) {
-            mainActivity().sendBytes(MotorProtocol.curveFrame(false))
+            try { mainActivity().sendBytes(MotorProtocol.curveFrame(false)) } catch (_: Exception) {}
             cur.dismiss()
             curveDialog = null
             curveBuf1.clear()
@@ -402,13 +403,19 @@ class MotorControlFragment : Fragment() {
         }
         curveBuf1.clear()
         curveBuf2.clear()
-        mainActivity().sendBytes(MotorProtocol.curveFrame(true))
+        try { mainActivity().sendBytes(MotorProtocol.curveFrame(true)) } catch (_: Exception) {}
         val title = if (type == "speed") "速度曲线" else "传感器曲线"
-        curveDialog = CurveDialog(requireContext(), title, { curveData() }, {
-            curveBuf1.clear(); curveBuf2.clear()
-        })
-        curveDialog?.show()
-        log("$title 已启动")
+        try {
+            curveDialog = CurveDialog(requireContext(), title, { curveData() }, {
+                curveBuf1.clear(); curveBuf2.clear()
+            })
+            curveDialog?.show()
+            log("$title 已启动")
+            Toast.makeText(requireContext(), "$title 已打开", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            log("❌ 打开曲线失败：${e.message}")
+            Toast.makeText(requireContext(), "打开曲线失败", Toast.LENGTH_SHORT).show()
+        }
     }
 
     private fun log(msg: String) {
