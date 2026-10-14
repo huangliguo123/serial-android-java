@@ -61,7 +61,7 @@ class CurveDialog(
         root.addView(tvTitle)
 
         root.addView(curveView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, dp(300)))
+            LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
 
         // ---- 控制按钮行 ----
         val bar = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
@@ -92,7 +92,7 @@ class CurveDialog(
         }
         root.addView(motorLabel)
 
-        // 行1：轴 + 位置 + 速度 + 步距
+        // 行1：轴 + 位置 + 速度
         val row1 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         val spAxis = Spinner(context).apply {
             adapter = ArrayAdapter(context, android.R.layout.simple_spinner_item, arrayOf("AP", "AF1", "AF2"))
@@ -108,23 +108,23 @@ class CurveDialog(
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             textSize = 14f
         }
+        row1.addView(spAxis, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row1.addView(edtPos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        row1.addView(edtSpeed, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        root.addView(row1, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT))
+
+        // 行2：往复步距 + 设置位置 + 复位 + 往复运动
+        val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         val edtRecurStep = EditText(context).apply {
             hint = "往复步距(um)"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER
             textSize = 14f
         }
-        row1.addView(spAxis, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        row1.addView(edtPos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        row1.addView(edtSpeed, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        row1.addView(edtRecurStep, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        root.addView(row1, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT))
-
-        // 行2：设置位置 + 复位 + 往复运动
-        val row2 = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         val btnSetPos = Button(context).apply { text = "设置位置" }
         val btnReset = Button(context).apply { text = "复位" }
         val btnRecur = Button(context).apply { text = "往复运动" }
+        row2.addView(edtRecurStep, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.2f))
         row2.addView(btnSetPos, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row2.addView(btnReset, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         row2.addView(btnRecur, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -152,8 +152,9 @@ class CurveDialog(
 
         setContentView(root)
 
+        // 固定高度（屏高 90%）：曲线用权重吃剩余空间，底部控件全部可见
         window?.setLayout((context.resources.displayMetrics.widthPixels * 0.92f).toInt(),
-            WindowManager.LayoutParams.WRAP_CONTENT)
+            (context.resources.displayMetrics.heightPixels * 0.9f).toInt())
         window?.setGravity(Gravity.CENTER)
 
         handler.postDelayed(ticker, 40)

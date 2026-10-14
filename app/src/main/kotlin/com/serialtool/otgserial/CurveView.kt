@@ -78,8 +78,8 @@ class CurveView @JvmOverloads constructor(
     private val gestureDetector = GestureDetector(context,
         object : GestureDetector.SimpleOnGestureListener() {
             override fun onScroll(e1: MotionEvent?, e2: MotionEvent, distanceX: Float, distanceY: Float): Boolean {
-                // 波形跟随手指方向移动
-                panBy(distanceX / width, distanceY / height)
+                // 波形与手指滑动同向
+                panBy(-distanceX / width, -distanceY / height)
                 return true
             }
         })
